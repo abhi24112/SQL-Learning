@@ -727,9 +727,9 @@ Divides a dataset into distinct subsets based on certain criteria.
 SELECT
     *,
     CASE
-        WHEN Bucket = 3  THEN "low"
+        WHEN Bucket = 3 THEN "low"
         WHEN Bucket = 2 THEN "medium"
-        ELSE "high" 
+        ELSE "high"
     END AS Category_segment
 FROM
     (
@@ -746,7 +746,81 @@ FROM
 
 -- 2. Data Engineer - (Equalizing load Processing)
 -- Ques: In order to export the data divide the orders into 2 groups.
-select 
-*,NTILE(2) over(order by orderid) Buckets 
-from salesdb.orders;
+SELECT
+    *,
+    NTILE(2) OVER (
+        ORDER BY
+            orderid
+    ) BUCKETS
+FROM
+    salesdb.orders;
 
+/*5. CUME_DIST() Cumulative distribution Window Function*/
+-- CUME_DIST() calculates the cumulative distribution of a value in a dataset. 
+SELECT
+    orderid,
+    sales,
+    CUME_DIST() OVER (
+        ORDER BY
+            sales
+    ) AS cume_distribution
+FROM
+    salesdb.orders;
+
+-- Interpretation: 70% of order have sales <= 50
+SELECT
+    orderid,
+    sales,
+    CUME_DIST() OVER (
+        ORDER BY
+            sales DESC
+    ) AS cume_distribution
+FROM
+    salesdb.orders;
+
+-- Interpretation: 30% of order have sales >= 60
+-- Ques: find teh products that fall within the highest 40% of the prices
+SELECT
+    *
+FROM
+    (
+        SELECT
+            product,
+            price,
+            CUME_DIST() OVER (
+                ORDER BY
+                    price DESC
+            ) DistRank
+        FROM
+            salesdb.products
+    ) t
+WHERE
+    DistRank <= 0.4;
+
+/*5. PERCENT_RANK()*/
+-- gives the relative rank of a row compared to others, scaled between 0 and 1.Lowest value → 0.0, Highest value → 1.0.
+-- PERCENT_RANK() is about relative standing in the ordered list.
+-- Ques: find teh products that fall within the highest 40% of the prices
+SELECT
+    product,
+    price,
+    DistRank,
+    concat(DistPercentRank * 100, "%") as DistRankPerc
+FROM
+    (
+        SELECT
+            product,
+            price,
+            CUME_DIST() OVER (
+                ORDER BY
+                    price DESC
+            ) DistRank,
+            PERCENT_RANK() OVER (
+                ORDER BY
+                    price DESC
+            ) DistPercentRank
+        FROM
+            salesdb.products
+    ) t
+WHERE
+    DistRank <= 0.4;
