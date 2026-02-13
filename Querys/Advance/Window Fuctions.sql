@@ -829,6 +829,8 @@ WHERE
 /*VALUE WINDOW FUNCTIONS*/
 -- Lead, Lag, First_value, Last_value
 -- These are designed to pull actual values from other rows in the window rather than compute aggregates or rankings.
+USE salesdb;
+
 /*1. Lead() and Lag() functions*/
 -- Lead: access next row with in the window.
 -- Lag: access previous row with in the window.
@@ -875,7 +877,10 @@ FROM
 SELECT
     customerid,
     AVG(DaysBeforeThisOrder) avg_day,
-    rank() over(order BY AVG(DaysBeforeThisOrder) desc)
+    RANK() OVER (
+        ORDER BY
+            AVG(DaysBeforeThisOrder) DESC
+    ) RankByLoyalty
 FROM
     (
         SELECT
@@ -899,5 +904,65 @@ FROM
         FROM
             salesdb.orders
     ) t
-GROUP BY customerid
-having AVG(DaysBeforeThisOrder) is not null;
+GROUP BY
+    customerid
+HAVING
+    AVG(DaysBeforeThisOrder) IS NOT NULL;
+
+/*2. First_value() and Last_value()*/
+-- gives the first and the last value from the given window.
+-- Ques: Find the lowest and highest sales for each product.
+SELECT
+    productid,
+    sales,
+    FIRST_VALUE(sales) OVER (
+        PARTITION BY
+            productid
+        ORDER BY
+            sales
+    ) Lowest_sales,
+    LAST_VALUE(sales) OVER (
+        PARTITION BY
+            productid
+        ORDER BY
+            sales ROWS BETWEEN CURRENT ROW
+            AND UNBOUNDED FOLLOWING
+    ) Highest_sales,
+    FIRST_VALUE(sales) OVER (
+        PARTITION BY
+            productid
+        ORDER BY
+            sales DESC
+    ) Lowest_sales,
+    MIN(sales) OVER (
+        PARTITION BY
+            productid
+    ) LowerSales2,
+    MAX(sales) OVER (
+        PARTITION BY
+            productid
+    ) HighestSales3
+FROM
+    salesdb.orders
+ORDER BY
+    productid;
+
+-- Ques: Find the difference in sales between the current and the lowest sales for each order
+SELECT
+    *,
+    (sales - lowest_sales) DiffCurrentAndLowest
+FROM
+    (
+        SELECT
+            orderid,
+            productid,
+            sales,
+            FIRST_VALUE(sales) OVER (
+                PARTITION BY
+                    productid
+                ORDER BY
+                    sales
+            ) lowest_sales
+        FROM
+            salesdb.orders
+    ) t
