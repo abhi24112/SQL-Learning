@@ -805,7 +805,7 @@ SELECT
     product,
     price,
     DistRank,
-    concat(DistPercentRank * 100, "%") as DistRankPerc
+    CONCAT(DistPercentRank * 100, "%") AS DistRankPerc
 FROM
     (
         SELECT
@@ -824,3 +824,80 @@ FROM
     ) t
 WHERE
     DistRank <= 0.4;
+
+-----------------------------------------------------------------------------
+/*VALUE WINDOW FUNCTIONS*/
+-- Lead, Lag, First_value, Last_value
+-- These are designed to pull actual values from other rows in the window rather than compute aggregates or rankings.
+/*1. Lead() and Lag() functions*/
+-- Lead: access next row with in the window.
+-- Lag: access previous row with in the window.
+-- Ques: Analyze the month-over-month(MoM) Performance by finding the percentage changes in sales between the current and previous month
+SELECT
+    MONTH(orderdate) month_num,
+    SUM(sales)
+FROM
+    salesdb.orders
+GROUP BY
+    month_num;
+
+SELECT
+    *,
+    CurrentMonthSales - PreviousMonthSales AS MoM_Change,
+    CONCAT(
+        ROUND(
+            COALESCE(
+                (CurrentMonthSales - PreviousMonthSales) / PreviousMonthSales * 100,
+                0
+            ),
+            2
+        ),
+        "%"
+    ) AS MoM_Perc_Change
+FROM
+    (
+        SELECT
+            MONTH(orderdate) month_num,
+            SUM(sales) CurrentMonthSales,
+            LAG(SUM(sales)) OVER (
+                ORDER BY
+                    MONTH(orderdate)
+            ) PreviousMonthSales
+        FROM
+            salesdb.orders
+        GROUP BY
+            month_num
+    ) t;
+
+-- CUSTOMER RETENTION ANALYSIS
+-- measure customer's behavior and loyalty to help businesses build strong relationships with customers.
+-- Ques: Analyze customer loyalty by ranking customers based on the average number of days between orders.
+SELECT
+    customerid,
+    AVG(DaysBeforeThisOrder) avg_day,
+    rank() over(order BY AVG(DaysBeforeThisOrder) desc)
+FROM
+    (
+        SELECT
+            customerid,
+            orderdate,
+            LAG(orderdate) OVER (
+                PARTITION BY
+                    customerid
+                ORDER BY
+                    orderdate
+            ) PreviousDate,
+            DATEDIFF(
+                orderdate,
+                LAG(orderdate) OVER (
+                    PARTITION BY
+                        customerid
+                    ORDER BY
+                        orderdate
+                )
+            ) DaysBeforeThisOrder
+        FROM
+            salesdb.orders
+    ) t
+GROUP BY customerid
+having AVG(DaysBeforeThisOrder) is not null;
