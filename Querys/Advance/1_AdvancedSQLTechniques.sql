@@ -498,11 +498,232 @@ WITH RECURSIVE
             e.firstname,
             e.managerid,
             LEVEL + 1
-        from salesdb.employees e
-        inner join CTE_Emp_Hierarchy ceh
-        on e.managerid = ceh.employeeid
+        FROM
+            salesdb.employees e
+            INNER JOIN CTE_Emp_Hierarchy ceh ON e.managerid = ceh.employeeid
     )
 SELECT
     *
 FROM
     CTE_Emp_Hierarchy;
+
+----------------------------------------------------------------------------------------
+/*VIEWS IN MYSQL*/
+-- it is like a virtual table that show data without storing it physically.
+-- views are dynamic and flexible
+-- DDL (Data Definition Language)
+-- a set of commands that allows us to define and manage the structure of a database.
+-- Ques: fine the running total of sales for each month
+WITH
+    CTE_Monthly_Summary AS (
+        SELECT
+            DATE_FORMAT(orderdate, '2025-%m-01') OrderMonth,
+            COUNT(Orderid) TotalOrders,
+            SUM(Quantity) AS TotalQuantity,
+            SUM(sales) AS TotalSales
+        FROM
+            salesdb.orders
+        GROUP BY
+            DATE_FORMAT(orderdate, '2025-%m-01')
+    )
+SELECT
+    OrderMonth,
+    TotalSales,
+    SUM(TotalSales) OVER (
+        ORDER BY
+            OrderMonth
+    ) AS RunningTotal,
+    TotalQuantity,
+    SUM(TotalQuantity) OVER (
+        ORDER BY
+            OrderMonth
+    ) AS RunningTotalQuantity
+FROM
+    CTE_Monthly_Summary;
+
+-- lets convert  the cte in view with more granuality
+CREATE VIEW
+    salesdb.VIEW_Monthly_Sales AS (
+        SELECT
+            DATE_FORMAT(orderdate, '2025-%m-01') OrderMonth,
+            COUNT(Orderid) TotalOrders,
+            SUM(Quantity) AS TotalQuantity,
+            SUM(sales) AS TotalSales
+        FROM
+            salesdb.orders
+        GROUP BY
+            DATE_FORMAT(orderdate, '2025-%m-01')
+    );
+
+SELECT
+    OrderMonth,
+    TotalSales,
+    SUM(TotalSales) OVER (
+        ORDER BY
+            OrderMonth
+    ) AS RunningTotal,
+    TotalQuantity,
+    SUM(TotalQuantity) OVER (
+        ORDER BY
+            OrderMonth
+    ) AS RunningTotalQuantity
+FROM
+    VIEW_Monthly_Sales;
+
+-- Drop View 
+DROP VIEW salesdb.view_monthly_sales;
+
+-- create or drop
+CREATE OR REPLACE VIEW
+    salesdb.view_total_sales AS (
+        SELECT
+            customerid,
+            SUM(sales) AS total_sales
+        FROM
+            salesdb.orders
+        GROUP BY
+            customerid
+    );
+
+-- TAsk: Provide a view that combines details from order, products,customers and employees
+CREATE OR REPLACE VIEW
+    salesdb.VIEW_Combine_Data AS (
+        SELECT
+            o.*,
+            CONCAT_WS(
+                " ",
+                COALESCE(c.firstname, ""),
+                COALESCE(c.lastname, "")
+            ) AS CustomerName,
+            c.country,
+            c.score,
+            p.product AS ProductName,
+            p.category,
+            p.price,
+            emp.*
+        FROM
+            salesdb.orders o
+            LEFT JOIN salesdb.customers c ON o.customerid = c.customerid
+            LEFT JOIN salesdb.products p ON o.productid = p.productid
+            LEFT JOIN (
+                SELECT
+                    e.employeeid,
+                    CONCAT_WS(
+                        " ",
+                        COALESCE(e.firstname, ""),
+                        COALESCE(e.lastname, "")
+                    ) AS SalesName,
+                    e.managerid,
+                    CONCAT_WS(
+                        " ",
+                        COALESCE(e1.firstname, "CEO"),
+                        COALESCE(e1.lastname, "")
+                    ) AS ManagerName,
+                    e.gender AS SalesGender,
+                    e.birthdate AS SalesBirtDate,
+                    e.department AS SalesDepartment,
+                    e.salary AS SaleSalary
+                FROM
+                    salesdb.employees e
+                    LEFT JOIN salesdb.employees e1 ON e.managerid = e1.employeeid
+            ) emp ON o.salespersonid = emp.employeeid
+    );
+
+-- using VIEW_Combined_Data
+SELECT
+    *
+FROM
+    salesdb.view_combine_data;
+
+-----------------------------------------------------------------
+/*CTAS & TEMP*/
+/*
+In MySQL, CTAS (Create Table As Select) is implemented using the CREATE TABLE ... SELECT statement. It allows you to create a new table based on the structure and/or data of an existing table
+ */
+-- 1. CTAS
+CREATE TABLE IF NOT EXISTS
+    salesdb.MonthSales AS
+SELECT
+    MONTHNAME(orderdate) MName,
+    SUM(sales) TotalSales
+FROM
+    salesdb.orders
+GROUP BY
+    MONTHNAME(orderdate);
+
+-- getting data from MonthSales
+SELECT
+    *
+FROM
+    MonthSales;
+
+-- Ques create a new table that have all the data or customers from salesdb.
+CREATE TABLE
+    salesdb.new_table AS
+SELECT
+    *
+FROM
+    salesdb.customers;
+
+--2. TEMP
+-- these are the table which is deleted after you disconnect from the database.
+-- means we can access the temp table in a one session only
+CREATE TEMPORARY TABLE
+    salesdb.temp_customer_sales AS
+SELECT
+    customerid,
+    SUM(sales)
+FROM
+    salesdb.orders
+GROUP BY
+    customerid;
+
+SELECT
+    *
+FROM
+    salesdb.temp_customer_sales;
+
+-- now disconnect the connection and try to run this
+SELECT
+    *
+FROM
+    salesdb.temp_customer_sales;
+
+-- This will give an error.
+----------------------------------------------------------------------------------------------
+/*Trigger in SQL*/
+-- trigger is a piece of query that runs when a certain DML (for mysql) happens like insert, update and delete.
+-- DDL Trigger are not supported in Mysql.
+-- /*table where logs are going to save*/
+CREATE TABLE IF NOT EXISTS
+    salesdb.EmployeeLogs (
+        LogId INT AUTO_INCREMENT PRIMARY KEY,
+        EmployeeID INT,
+        LogMessage VARCHAR(255),
+        LogDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+-- Creating Trigger
+CREATE TRIGGER salesdb.trg_AfterInsertEmployee AFTER
+INSERT
+    ON salesdb.employees FOR EACH ROW 
+BEGIN
+INSERT INTO
+    salesdb.EmployeeLogs (EmployeeId, LogMessage)
+VALUES
+    (
+        NEW.EmployeeID,
+        CONCAT('New EmployeeId Added = ', EmployeeID)
+    );
+END;
+
+-- Inserting value in employees
+INSERT INTO salesdb.employees
+VALUES (6, 'Maria', 'Doe', 'HR', '1988-01-12', 'F', 80000, 3);
+
+-- Checking for Employee log input
+    select * from salesdb.EmployeeLogs;
+INSERT INTO salesdb.employees
+VALUES 
+(7, 'Ram', 'Das', 'CS', '1988-06-02', 'M', 90000, 4),
+(8, 'Rakesh', 'prajapati', 'IT', '1923-02-01', 'F', 20000, 2);

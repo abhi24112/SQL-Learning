@@ -453,6 +453,28 @@ FROM
     LEFT JOIN salesdb.products p ON o.productid = p.productid
     LEFT JOIN salesdb.employees e ON o.salespersonid = e.employeeid;
 
+-- Ques find the manager names of the employees 
+SELECT
+    e.employeeid,
+    CONCAT_WS(
+        " ",
+        COALESCE(e.firstname, ""),
+        COALESCE(e.lastname, "")
+    ) AS SalesName,
+    e.managerid,
+    CONCAT_WS(
+        " ",
+        COALESCE(e1.firstname, "CEO"),
+        COALESCE(e1.lastname, "")
+    ) AS ManagerName,
+    e.gender AS SalesGender,
+    e.birthdate AS SalesBirtDate,
+    e.department AS SalesDepartment,
+    e.salary AS SaleSalary
+FROM
+    salesdb.employees e
+    LEFT JOIN salesdb.employees e1 ON e.managerid = e1.employeeid
+
 -------------------------------------------------------------------
 -- SET METHODS IN SQL (Order by is allowed at end only)
 /*Union, Unionall, Except, Intersection*/
