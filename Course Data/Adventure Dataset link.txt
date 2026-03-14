@@ -1,0 +1,25 @@
+https://learn.microsoft.com/en-us/sql/samples/adventureworks-install-configure?view=sql-server-ver17&tabs=ssms
+
+## Restoration Queries
+
+-- Restoring AdventureWorks Databases
+RESTORE FILELISTONLY FROM DISK = 'C:\SQLBackups\AdventureWorks2022.bak';
+RESTORE DATABASE AdventureWorks2022
+FROM DISK = 'C:\SQLBackups\AdventureWorks2022.bak'
+WITH 
+MOVE 'AdventureWorks2022' 
+TO 'C:\Program Files\Microsoft SQL Server\MSSQL16.SQLEXPRESS\MSSQL\DATA\AdventureWorks2022.mdf',
+MOVE 'AdventureWorks2022_log' 
+TO 'C:\Program Files\Microsoft SQL Server\MSSQL16.SQLEXPRESS\MSSQL\DATA\AdventureWorks2022_log.ldf',
+REPLACE,
+RECOVERY;
+
+RESTORE DATABASE AdventureWorksDW2022
+FROM DISK = 'C:\SQLBackups\AdventureWorksDW2022.bak'
+WITH 
+MOVE 'AdventureWorksDW2022' 
+TO 'C:\Program Files\Microsoft SQL Server\MSSQL16.SQLEXPRESS\MSSQL\DATA\AdventureWorksDW2022.mdf',
+MOVE 'AdventureWorksDW2022_log' 
+TO 'C:\Program Files\Microsoft SQL Server\MSSQL16.SQLEXPRESS\MSSQL\DATA\AdventureWorksDW2022_log.ldf',
+REPLACE,
+RECOVERY;
